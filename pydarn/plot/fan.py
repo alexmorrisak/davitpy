@@ -99,7 +99,12 @@ def plotFan(dateStr,rad,time=[0,0],interval=1,fileType='fitex',param='velocity',
 		elif(param == 'phi0'): scale=[-numpy.pi,numpy.pi]
 			
 	#check for plotting directory, create if does not exist
-	d = os.environ['PYPLOTS']+'/fan'
+        pyplot_key = 'PYPLOTS'
+        if os.environ.has_key(pyplot_key):
+          d = os.environ[pyplot_key]+'/fan'
+        else:
+          d = os.environ['HOME']+'/fan'
+
 	if not os.path.exists(d):
 		os.makedirs(d)
 		
