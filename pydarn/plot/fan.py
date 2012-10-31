@@ -589,16 +589,17 @@ def radDataPlotFan(radDataObj,dateTime=None,interval=1,param='velocity',
 	miny = y.min()
 	maxx = x.max()
 	maxy = y.max()
-	width = (maxx-minx)
-	height = (maxy-miny)
+	width = 1.2*(maxx-minx)
+	height = 1.2*(maxy-miny)
 	cx = minx + width/2.
 	cy = miny + height/2.
 	lon_0,lat_0 = tmpmap(cx, cy, inverse=True)
 	dist = width/50.
 	cTime = sTime
+
+        #import ipdb; ipdb.set_trace()
 	
 	myFig = plot.figure()
-
 
 	#draw the actual map we want
 	myMap = Basemap(projection='stere',width=width,height=height,lon_0=numpy.mean(lonFull),lat_0=lat_0)
