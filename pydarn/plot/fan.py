@@ -433,3 +433,302 @@ def plotFanData(myData,myMap,param,coords='geo',gsct=0,site=None,\
 
 		if(gsct): gs_flg.append(myData['fit']['gflg'][k])
 
+
+#def radDataPlotFan(dateStr,rad,time=[0,0],interval=1,fileType='fitex',param='velocity',filter=0 ,\
+#		scale=[],channel='a',coords='geo',colors='lasse',gsct=0,fov=1,edgeColors='face',gflg=0,fill=1,\
+#		velscl=1000.,legend=1):
+def radDataPlotFan(radDataObj,dateTime=None,interval=1,param='velocity',
+		scale=[],channel='a',coords='geo',colors='lasse',gsct=0,fov=1,edgeColors='face',gflg=0,fill=1,
+		velscl=1000.,legend=1):
+	"""
+|	*************************************************
+|	**PACKAGE**: pydarn.plot.fan
+|	**FUNCTION**: plotFan(dateStr,rad,time=[0,0],interval=1,param='velocity',
+|								scale=[],coords='geo',colors='lasse',gsct=0,pdf=0,fov=1,edgeColors='face',gflg=0)
+|	**PURPOSE**: makes fov (fan) plots
+|
+|	**INPUTS**:
+|		**radDataObj**: a radData object containing data to plot
+|		**[dateTime]**: a datetime.datetime object.
+|                       if None: Then the first scan in radDataObj is plotted.
+|                       if len(dateTime) == 1: Only the scan starting at that time is plotted.
+|                       if len(dateTime) == 2: Scans from dateTime[0] to dateTime[1] are plotted.
+|		**[interval]**: the interval between fan plots, in minutes
+|		**[param]**: the parameter to be plotted, valid inputs are 'velocity', 
+|			'power', 'width', 'elevation', 'phi0'.  default = 'velocity
+|		**[scale]**: the min and max values of the color scale.  If this is set to []
+|			then default values will be used
+|		**[coords]**: the coordinate system to use, valid inputs are 'geo' and 'mag'
+|			default = 'geo'
+|		**[colors]**: the color map to use, valid inputs are 'lasse', 'aj'
+|			default = 'lasse'
+|		**[gsct]**: a flag indicating whether to plot ground scatter as gray.
+|			default = 0
+|		**[fov]**: a flag indicating whether to overplot the radar fields of view
+|			default = 1
+|		**[edgeColors]**: edge colors of the polygons, default = 'face'
+|		**[gflg]**: a flag indicating whether to plot low velocities in gray
+|			default = 0
+|		**[fill]**: a flag indicating whether to plot filled or point RB cells
+|			default = 1
+|		**[velscl]**: the velocity to use as baseline for velocity vector length,
+|			only applicable if fill = 0.  default = 1000
+|		**[legend]**: a flag indicating whether to plot the legend
+|			only applicable if fill = 0.  default = 1
+|	**OUTPUTS**:
+|		NONE
+|
+|	**EXAMPLE**:
+|		plotFan(radDataObj,interval=2,param='velocity',scale=[-400,400],coords='geo',colors='lasse',gsct=0,pdf=0,fov=1,edgeColors='face',gflg=0)
+|
+|	Written by AJ and Nathaniel 20121030
+|
+	"""
+	
+	from matplotlib.backends.backend_pdf import PdfPages
+	import models.aacgm as aacgm
+
+        radDataObj = numpy.array(radDataObj)
+	
+	#check the inputs
+#	assert(isinstance(dateStr,str) and len(dateStr) == 8),'error, dateStr must be a string 8 chars long'
+#	assert(coords == 'geo' or coords == 'mag'),"error, coords must be one of 'geo' or 'mag'"
+#	assert(param == 'velocity' or param == 'power' or param == 'width' or \
+#		param == 'elevation' or param == 'phi0'), \
+#		"error, allowable params are 'velocity','power','width','elevation','phi0'"
+#	assert(scale == [] or len(scale)==2), \
+#	'error, if present, scales must have 2 elements'
+#	assert(colors == 'lasse' or colors == 'aj'),"error, valid inputs for color are 'lasse' and 'aj'"
+	
+	if(scale == []):
+		if(param == 'velocity'): scale=[-200,200]
+		elif(param == 'power'): scale=[0,30]
+		elif(param == 'width'): scale=[0,150]
+		elif(param == 'elevation'): scale=[0,50]
+		elif(param == 'phi0'): scale=[-numpy.pi,numpy.pi]
+			
+	#check for plotting directory, create if does not exist
+        pyplot_key = 'PYPLOTS'
+        if os.environ.has_key(pyplot_key):
+          d = os.environ[pyplot_key]+'/fan'
+        else:
+          d = os.environ['HOME']+'/fan'
+
+	if not os.path.exists(d):
+		os.makedirs(d)
+		
+        availDt = radDataObj[0].getTimes()
+        if dateTime == None:
+          sTime=availDt[0]
+          eTime=availDt[0]
+        elif numpy.size(dateTime) == 1:
+          sTime=dateTime[0]
+          eTime=dateTime[0]
+        elif numpy.size(dateTime) == 2:
+          sTime=dateTime[0]
+          eTime=dateTime[1]
+
+        if sTime < availDt[0]: sTime = availDt[0]
+        if eTime > availDt[-1]: eTime = availDt[-1]
+
+        pp = PdfPages(d+'/'+sTime.strftime('%Y%m%d')+'.fan.pdf')
+
+	xmin,ymin,xmax,ymax = 1e16,1e16,-1e16,-1e16
+
+	allBeams = [''] * len(radDataObj)
+	rad,sites,fovs,oldCpids,lonFull,latFull=[],[],[],[],[],[]
+	#go through all provided radData objects.
+	for i in range(len(radDataObj)):
+          allBeams[i] = []
+          availDt = numpy.array(radDataObj[i].getTimes())
+          inx = numpy.where(availDt >= sTime)
+          inx = inx[0][0]
+          #check scan and beam
+          scan  = 0
+          beams = []
+          #Get every beam in the scan; skip over repeated beams (as in THEMIS mode)
+          while scan != 1:
+            if radDataObj[i][availDt[inx]]['prm']['bmnum'] in beams:
+              inx += 1
+              scan = radDataObj[i][availDt[inx]]['prm']['scan'] 
+              continue
+            allBeams[i].append(radDataObj[i][availDt[inx]])
+            beams.append(radDataObj[i][availDt[inx]]['prm']['bmnum'])
+            inx += 1
+            scan = radDataObj[i][availDt[inx]]['prm']['scan'] 
+
+          #get to field of view coords in order to determine map limits
+          t=allBeams[i][0]['prm']['time']
+          code = pydarn.radar.network().getRadarById(allBeams[i][0]['prm']['stid']).code[0]
+          rad.append(code)
+          site = pydarn.radar.network().getRadarById(allBeams[i][0]['prm']['stid']).getSiteByDate(t)
+          sites.append(site)
+          if(coords == 'geo'):
+                  latFull.append(site.geolat)
+                  lonFull.append(site.geolon)
+          elif(coords == 'mag'):
+                  x = aacgm.aacgmConv(site.geolat,site.geolon,0.,0)
+                  latFull.append(x[0])
+                  lonFull.append(x[1])
+          myFov = pydarn.radar.radFov.fov(site=site,rsep=allBeams[i][0]['prm']['rsep'],\
+                                          ngates=allBeams[i][0]['prm']['nrang']+1,nbeams=site.maxbeam,coords=coords)
+          fovs.append(myFov)
+          for b in range(0,site.maxbeam+1):
+                  for k in range(0,allBeams[i][0]['prm']['nrang']+1):
+                          lonFull.append(myFov.lonFull[b][k])
+                          latFull.append(myFov.latFull[b][k])
+          oldCpids.append(allBeams[i][0]['prm']['cp'])
+			
+	#do some stuff in map projection coords to get necessary width and height of map
+	lon_0 = (xmin+xmax)/2.
+	lat_0 = (ymin+ymax)/2.
+	lonFull,latFull = (numpy.array(lonFull)+360.)%360.,numpy.array(latFull)
+	tmpmap = Basemap(projection='npstere', boundinglat=20,lat_0=90, lon_0=numpy.mean(lonFull))
+	x,y = tmpmap(lonFull,latFull)
+	minx = x.min()
+	miny = y.min()
+	maxx = x.max()
+	maxy = y.max()
+	width = (maxx-minx)
+	height = (maxy-miny)
+	cx = minx + width/2.
+	cy = miny + height/2.
+	lon_0,lat_0 = tmpmap(cx, cy, inverse=True)
+	dist = width/50.
+	cTime = sTime
+	
+	myFig = plot.figure()
+
+
+	#draw the actual map we want
+	myMap = Basemap(projection='stere',width=width,height=height,lon_0=numpy.mean(lonFull),lat_0=lat_0)
+	myMap.drawparallels(numpy.arange(-80.,81.,10.),labels=[1,0,0,0])
+	myMap.drawmeridians(numpy.arange(-180.,181.,20.),labels=[0,0,0,1])
+	if(coords == 'geo'):
+		myMap.drawcoastlines(linewidth=0.5,color='k')
+		myMap.drawmapboundary(fill_color='w')
+		myMap.fillcontinents(color='w', lake_color='w')
+	#overlay fields of view, if desired
+	if(fov == 1):
+		for r in rad:
+			pydarn.plot.overlayRadar(myMap, codes=r, dateTime=sTime, coords=coords)
+			pydarn.plot.overlayFov(myMap, codes=r, dateTime=sTime,coords=coords)
+				
+	#manually draw the legend
+	if(fill == 0 and legend == 1):
+		#draw the box
+		y = [myMap.urcrnry*.82,myMap.urcrnry*.99]
+		x = [myMap.urcrnrx*.86,myMap.urcrnrx*.99]
+		verts = [x[0],y[0]],[x[0],y[1]],[x[1],y[1]],[x[1],y[0]]
+		poly = patches.Polygon(verts,fc='w',ec='k',zorder=11)
+		myFig.gca().add_patch(poly)
+		labs = ['5 dB','15 dB','25 dB','35 dB','gs','1000 m/s']
+		pts = [5,15,25,35]
+		#plot the icons and labels
+		for w in range(6):
+			myFig.gca().text(x[0]+.35*(x[1]-x[0]),y[1]*(.98-w*.025),labs[w],zorder=15,color='k',size=6,va='center')
+			xctr = x[0]+.175*(x[1]-x[0])
+			if(w < 4):
+				plot.scatter(xctr,y[1]*(.98-w*.025),s=.1*pts[w],zorder=15,marker='o',linewidths=.5,\
+				edgecolor='face',facecolor='k')
+			elif(w == 4):
+				plot.scatter(xctr,y[1]*(.98-w*.025),s=.1*35.,zorder=15,marker='o',\
+				linewidths=.5,edgecolor='k',facecolor='w')
+			elif(w == 5):
+				y=LineCollection(numpy.array([((xctr-dist/2.,y[1]*(.98-w*.025)),(xctr+dist/2.,y[1]*(.98-w*.025)))]),linewidths=.5,zorder=15,color='k')
+				myFig.gca().add_collection(y)
+				
+	bbox = myFig.gca().get_axes().get_position()
+	#now, loop through desired time interval
+	while(cTime <= eTime):
+		bndTime = cTime + datetime.timedelta(minutes=interval)
+
+		gs_flg,lines = [],[]
+		if(fill == 1): verts,intensities = [],[]
+		
+		else: verts,intensities = [[],[]],[[],[]]
+		
+		ft = 'None'
+################################################################################
+		#go though all radDataObj's
+		for i in range(len(allBeams)):
+                  for bb in range(len(allBeams[i])):
+                    plotFanData(allBeams[i][bb],myMap,param,coords,gsct=gsct,site=sites[i],fov=fovs[i],
+                        verts=verts,intensities=intensities,gs_flg=gs_flg,fill=fill,velscl=velscl, 
+                        lines=lines,dist=dist)
+				
+		#if we are filling rb cells
+		if(fill == 1):
+			#if we have data
+			if(verts != []):
+				if(gsct == 0):
+					inx = numpy.arange(len(verts))
+				else:
+					inx = numpy.where(numpy.array(gs_flg)==0)
+					x=PolyCollection(numpy.array(verts)[numpy.where(numpy.array(gs_flg)==1)],facecolors='.3',linewidths=0,alpha=.5,zorder=5)
+					myFig.gca().add_collection(x, autolim=True)
+					
+				pcoll = PolyCollection(numpy.array(verts)[inx],edgecolors=edgeColors,linewidths=0,closed=False,zorder=10,rasterized=True)
+				#set color array to intensities
+				pcoll.set_array(numpy.array(intensities)[inx])
+				myFig.gca().add_collection(pcoll, autolim=True)
+				#generate color map
+				pydarn.plot.plotUtils.genCmap(myMap,pcoll,param,scale,colors=colors,map=1,gflg=gflg)
+		#if we are plotting points and vectors
+		else:
+			#if we have data
+			if(verts != [[],[]]):
+				if(gsct == 0):
+					inx = numpy.arange(len(verts[0]))
+				else:
+					inx = numpy.where(numpy.array(gs_flg)==0)
+					#plot the ground scatter as open circles
+					x = plot.scatter(numpy.array(verts[0])[numpy.where(numpy.array(gs_flg)==1)],\
+							numpy.array(verts[1])[numpy.where(numpy.array(gs_flg)==1)],\
+							s=.1*numpy.array(intensities[1])[numpy.where(numpy.array(gs_flg)==1)],\
+							zorder=5,marker='o',linewidths=.5,facecolors='w',edgecolors='k')
+					myFig.gca().add_collection(x, autolim=True)
+					
+				#plot the i-s as filled circles
+				ccoll = myFig.gca().scatter(numpy.array(verts[0])[inx],numpy.array(verts[1])[inx],\
+								s=.1*numpy.array(intensities[1])[inx],zorder=10,marker='o',linewidths=.5,edgecolors='face')
+				
+				#set color array to intensities
+				ccoll.set_array(numpy.array(intensities[0])[inx])
+				#generate color map
+				pydarn.plot.plotUtils.genCmap(myMap,ccoll,param,scale,colors=colors,map=1,gflg=gflg)
+				myFig.gca().add_collection(ccoll)
+				#plot the velocity vectors
+				lcoll = LineCollection(numpy.array(lines)[inx],linewidths=.5,zorder=12)
+				lcoll.set_array(numpy.array(intensities[0])[inx])
+				pydarn.plot.plotUtils.genCmap(myMap,lcoll,param,scale,colors=colors,map=1,gflg=gflg)
+				myFig.gca().add_collection(lcoll)
+################################################################################
+		myFig.gca().set_rasterized(True)
+		#label the plot
+		tx1 = plot.figtext((bbox.x0+bbox.x1)/2.,bbox.y1+.02,cTime.strftime('%d/%m/%Y'),ha='center',size=14,weight=550)
+		tx2 = plot.figtext(bbox.x1,bbox.y1+.02,cTime.strftime('%H:%M - ')+\
+					bndTime.strftime('%H:%M      '),ha='right',size=13,weight=550)
+		tx3 = plot.figtext(bbox.x0,bbox.y1+.02,'['+ft[1:]+']',ha='left',size=13,weight=550)
+		#save plot to pdf
+		myFig.savefig(pp, format='pdf', dpi=300,orientation='landscape')
+		myFig.show()
+		#return myFig,ccoll
+		#ccoll.remove()
+		#lcoll.remove()
+		if(verts != [[],[]] and verts != []):
+			if(fill == 1): 
+				pcoll.remove()
+			else: 
+				ccoll.set_paths([])
+				lcoll.remove()
+			
+			if(gsct == 1): x.remove()
+			
+		myFig.texts.remove(tx1)
+		myFig.texts.remove(tx2)
+		myFig.texts.remove(tx3)
+		#increment time by interval
+		cTime = bndTime
+	#close the pdf
+	pp.close()

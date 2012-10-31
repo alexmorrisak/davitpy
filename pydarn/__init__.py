@@ -27,6 +27,7 @@ from plot import *
 from proc import *
 from datetime import *
 from utils import *
+from vtrad import *
 import dmapio 
 import radar 
 import sdio 
