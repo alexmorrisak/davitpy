@@ -62,9 +62,11 @@ upper-right, upper-left.
 			elevation=None, altitude=300., \
 			model='IS', coords='geo'):
 		# Get fov
-		from numpy import ndarray, array, arange, zeros
+		from numpy import ndarray, array, arange, zeros, nan
 		import models.aacgm as aacgm
-		
+                from math import asin, sqrt, pi
+                from utils import Re
+
 		# Test that we have enough input arguments to work with
 		if not site and None in [nbeams, ngates, bmsep, recrise, siteLat, siteLon, siteBore, siteAlt]:
 			print 'calcFov: must provide either a site object or [nbeams, ngates, bmsep, recrise, siteLat, siteLon, siteBore, siteAlt].'
@@ -192,6 +194,21 @@ upper-right, upper-left.
 				else:
 					tElev = elevation[ib,ig]
 					tAlt = altitude[ib,ig]
+
+                                #import ipdb; ipdb.set_trace()
+                                #Adjust range for GS model. [Bristow et al., 1994]
+                                if model == 'GS':
+                                  src = slantRangeCenter[ib,ig]
+                                  srf = slantRangeFull[ib,ig]
+                                  if ((src^2./4. - talt^2.) >= 0) and ((srf^2./4. - talt^2.) >= 0):
+                                    src = Re * asin(sqrt(src^2./4. - talt^2)/Re)
+                                    srf = Re * asin(sqrt(srf^2./4. - talt^2)/Re)
+                                  else:
+                                    src = nan
+                                    srf = nan
+                                  slantRangeCenter[ib,ig] = src
+                                  slantRangeFull[ib,ig] = srf
+
 				# Then calculate projections
 				latC, lonC = calcFieldPnt(siteLat, siteLon, siteAlt*1e-3, siteBore, bOffCenter[ib], sRangCenter[ig], \
 							elevation=tElev, altitude=tAlt, model=model)
