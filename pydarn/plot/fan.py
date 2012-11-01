@@ -21,7 +21,7 @@ from utils.timeUtils import *
 from pydarn.sdio.radDataRead import *
 
 def plotFan(dateStr,rad,time=[0,0],interval=1,fileType='fitex',param='velocity',filter=0 ,\
-		scale=[],channel='a',coords='geo',colors='lasse',gsct=0,fov=1,edgeColors='face',gflg=0,fill=1,\
+		scale=[],channel='a',coords='geo',model='IS',colors='lasse',gsct=0,fov=1,edgeColors='face',gflg=0,fill=1,\
 		velscl=1000.,legend=1):
 	"""
 |	*************************************************
@@ -49,6 +49,11 @@ def plotFan(dateStr,rad,time=[0,0],interval=1,fileType='fitex',param='velocity',
 |		**[channel]**: the channel for which to plot data.  default = 'a'
 |		**[coords]**: the coordinate system to use, valid inputs are 'geo' and 'mag'
 |			default = 'geo'
+|		**[model]**: the model to use when calculating the radar FOV. This is passed to radFov.fov.
+|                       Options:
+|                         'IS': Ionospheric (default)
+|                         'GS': Ground Scatter (Used for MSTID/Gravity Wave Studies, see Bristow et al. [1994]
+|                         None: Not recommended unless you know what you are doing.
 |		**[colors]**: the color map to use, valid inputs are 'lasse', 'aj'
 |			default = 'lasse'
 |		**[gsct]**: a flag indicating whether to plot ground scatter as gray.
@@ -157,7 +162,7 @@ def plotFan(dateStr,rad,time=[0,0],interval=1,fileType='fitex',param='velocity',
 			latFull.append(x[0])
 			lonFull.append(x[1])
 		myFov = pydarn.radar.radFov.fov(site=site,rsep=allBeams[i]['prm']['rsep'],\
-						ngates=allBeams[i]['prm']['nrang']+1,nbeams=site.maxbeam,coords=coords)
+						ngates=allBeams[i]['prm']['nrang']+1,nbeams=site.maxbeam,coords=coords,model=model)
 		fovs.append(myFov)
 		for b in range(0,site.maxbeam+1):
 			for k in range(0,allBeams[i]['prm']['nrang']+1):
@@ -344,7 +349,7 @@ def plotFan(dateStr,rad,time=[0,0],interval=1,fileType='fitex',param='velocity',
 		
 	print 'file is at: '+d+'/'+dateStr+'.fan.pdf'
 
-def plotFanData(myData,myMap,param,coords='geo',gsct=0,site=None,\
+def plotFanData(myData,myMap,param,coords='geo',model='IS',gsct=0,site=None,\
 		fov=None,verts=[],intensities=[],gs_flg=[],fill=1,velscl=1000.,lines=[],dist=1000.):
 	"""
 | *************************************************
@@ -358,6 +363,11 @@ def plotFanData(myData,myMap,param,coords='geo',gsct=0,site=None,\
 |		**myMap**: the map we are plotting on
 |		**[param]**: the parameter we are plotting
 |		**[coords]**: the coordinates we are plotting in
+|		**[model]**: the model to use when calculating the radar FOV. This is passed to radFov.fov.
+|                       Options:
+|                         'IS': Ionospheric (default)
+|                         'GS': Ground Scatter (Used for MSTID/Gravity Wave Studies, see Bristow et al. [1994]
+|                         None: Not recommended unless you know what you are doing.
 |		**[param]**: the parameter to be plotted, valid inputs are 'velocity', 
 |			'power', 'width', 'elevation', 'phi0'.  default = 'velocity
 |		**[gsct]**: a flag indicating whether we are distinguishing groudn  scatter
@@ -387,7 +397,7 @@ def plotFanData(myData,myMap,param,coords='geo',gsct=0,site=None,\
 		site = pydarn.radar.network().getRadarById(myData['prm']['stid']).getSiteByDate(myData['prm']['time'])
 	if(fov == None):
 		fov = pydarn.radar.radFov.fov(site=site,rsep=myData['prm']['rsep'],\
-		ngates=myData['prm']['nrang']+1,nbeams= site.maxbeam,coords=coords)	
+		ngates=myData['prm']['nrang']+1,nbeams= site.maxbeam,coords=coords,model=model)	
 	
 		
 	#loop through gates with scatter
@@ -571,7 +581,7 @@ def radDataPlotFan(radDataObj,dateTime=None,interval=1,param='velocity',
                   latFull.append(x[0])
                   lonFull.append(x[1])
           myFov = pydarn.radar.radFov.fov(site=site,rsep=allBeams[i][0]['prm']['rsep'],\
-                                          ngates=allBeams[i][0]['prm']['nrang']+1,nbeams=site.maxbeam,coords=coords)
+                                          ngates=allBeams[i][0]['prm']['nrang']+1,nbeams=site.maxbeam,coords=coords,model=model)
           fovs.append(myFov)
           for b in range(0,site.maxbeam+1):
                   for k in range(0,allBeams[i][0]['prm']['nrang']+1):
