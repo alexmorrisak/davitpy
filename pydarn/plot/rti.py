@@ -29,9 +29,8 @@ from matplotlib.collections import PolyCollection
 from utils.timeUtils import *
 from pydarn.sdio import *
 
-
 def plotRti(dateStr,rad,beam=7,time=[0,2400],fileType='fitex',params=['velocity','power','width'], \
-scales=[],channel='a',coords='gate',colors='lasse',yrng=-1,gsct=0,pdf=0,filter=0,gflg=0):
+scales=[],channel='a',coords='gate',model='IS',colors='lasse',yrng=-1,gsct=0,pdf=0,filter=0,gflg=0):
 	"""
 	*******************************
 	
@@ -188,8 +187,7 @@ scales=[],channel='a',coords='gate',colors='lasse',yrng=-1,gsct=0,pdf=0,filter=0
 		elif(params[p] == 'phi0'): pArr = phi0
 		pos = [.1,figtop-figheight*(p+1)+.02,.76,figheight-.02]
 		
-		ax = drawAxes(rtiFig,times,rad,cpid,beam,nrang,frang,rsep,p==len(params)-1,yrng=yrng,coords=coords,\
-		pos=pos)
+		ax = drawAxes(rtiFig,times,rad,cpid,beam,nrang,frang,rsep,p==len(params)-1,yrng=yrng,coords=coords,model=model,pos=pos)
 			
 
 		if(pArr == []): continue
@@ -213,11 +211,14 @@ scales=[],channel='a',coords='gate',colors='lasse',yrng=-1,gsct=0,pdf=0,filter=0
 				data[tcnt][slist[i][j]] = pArr[i][j]
 				
 		if(coords == 'gate'): y = numpy.linspace(0,rmax,rmax+1)
-		elif(coords == 'rng'): y = numpy.linspace(frang[0],rmax*rsep[0],rmax+1)
+		elif(coords == 'rng'):
+                    site = pydarn.radar.network().getRadarByCode(rad).getSiteByDate(times[0])
+                    myFov = pydarn.radar.radFov.fov(site=site, ngates=rmax,nbeams=site.maxbeam,rsep=rsep[0],coords=coords,model=model)
+                    y = myFov.slantRCenter[beam]
 		else:
-			site = pydarn.radar.network().getRadarByCode(rad).getSiteByDate(times[0])
-			myFov = pydarn.radar.radFov.fov(site=site, ngates=rmax,nbeams=site.maxbeam,rsep=rsep[0],coords=coords)
-			y =  myFov.latFull[beam]
+                    site = pydarn.radar.network().getRadarByCode(rad).getSiteByDate(times[0])
+                    myFov = pydarn.radar.radFov.fov(site=site, ngates=rmax,nbeams=site.maxbeam,rsep=rsep[0],coords=coords,model=model)
+                    y =  myFov.latFull[beam]
 			
 		X, Y = numpy.meshgrid(x[:tcnt], y)
 		
@@ -241,7 +242,7 @@ scales=[],channel='a',coords='gate',colors='lasse',yrng=-1,gsct=0,pdf=0,filter=0
 	print datetime.datetime.now()-t1
 
 	
-def drawAxes(myFig,times,rad,cpid,bmnum,nrang,frang,rsep,bottom,yrng=-1,coords='gate',pos=[.1,.05,.76,.72]):
+def drawAxes(myFig,times,rad,cpid,bmnum,nrang,frang,rsep,bottom,yrng=-1,coords='gate',model='IS',pos=[.1,.05,.76,.72]):
 	"""
 	*******************************
 
@@ -274,7 +275,8 @@ def drawAxes(myFig,times,rad,cpid,bmnum,nrang,frang,rsep,bottom,yrng=-1,coords='
 		ax = drawAxes(rtiFig,times,rad,cpid,beam,nrang,frang,rsep,p==len(params)-1,yrng=yrng,coords=coords,\
 			pos=pos)
 			
-	Written by AJ 20121002
+	Written by AJ Ribiero 20121002
+                   Nathaniel Frissell 20121105
 
 	"""
 	
@@ -335,13 +337,17 @@ def drawAxes(myFig,times,rad,cpid,bmnum,nrang,frang,rsep,bottom,yrng=-1,coords='
 		ax.yaxis.set_major_locator(MultipleLocator((ymax-ymin)/5.))
 		ax.yaxis.set_minor_locator(MultipleLocator((ymax-ymin)/25.))
 	elif(coords == 'geo' or coords == 'mag'): 
-		if(coords == 'mag'): ax.yaxis.set_label_text('Mag Lat [deg]',size=10)
-		else: ax.yaxis.set_label_text('Geo Lat [deg]',size=10)
+		if(coords == 'mag'): ylbl = 'Mag Lat [deg]'
+		else: ylbl = 'Geo Lat [deg]'
+                if model=='GS': ylbl = '\n'.join([ylbl,'GS Model'])
+		ax.yaxis.set_label_text(ylbl,size=10,horizontalalignment='center')
 		ax.yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter('%0.2f'))
 		ax.yaxis.set_major_locator(MultipleLocator((ymax-ymin)/5.))
 		ax.yaxis.set_minor_locator(MultipleLocator((ymax-ymin)/25.))
 	elif(coords == 'rng'): 
-		ax.yaxis.set_label_text('Slant Range [km]',size=10)
+                ylbl = 'Slant Range [km]'
+                if model=='GS': ylbl = '\n'.join([ylbl,'GS Model'])
+		ax.yaxis.set_label_text(ylbl,size=10,horizontalalignment='center')
 		ax.yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter('%d'))
 		ax.yaxis.set_major_locator(MultipleLocator(1000))
 		ax.yaxis.set_minor_locator(MultipleLocator(250))
