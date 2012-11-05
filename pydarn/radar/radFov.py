@@ -62,9 +62,9 @@ upper-right, upper-left.
 			elevation=None, altitude=300., \
 			model='IS', coords='geo'):
 		# Get fov
-		from numpy import ndarray, array, arange, zeros, nan
+		from numpy import ndarray, array, arange, zeros, nan, where, logical_or, sin, arcsin, sqrt
 		import models.aacgm as aacgm
-                from math import asin, sqrt, pi
+                from math import pi, radians
                 from utils import Re
 
 		# Test that we have enough input arguments to work with
@@ -87,6 +87,7 @@ upper-right, upper-left.
 		# If frang, rsep or recrise are arrays, then they should be of shape (nbeams,)
 		# Set a flag if any of frang, rsep or recrise is an array
 		isParamArray = False
+                isAltElParamArray = False
 		if isinstance(frang, ndarray):
 			isParamArray = True
 			if len(frang) != nbeams: 
@@ -114,6 +115,7 @@ upper-right, upper-left.
 		
 		# If altitude or elevation are arrays, then they should be of shape (nbeams,ngates)
 		if isinstance(altitude, ndarray):
+			isAltElParamArray = True
 			if altitude.ndim == 1:
 				if altitude.size != ngates:
 					print 'getFov: altitude must be of a scalar or ndarray(ngates) or ndarray(nbeans,ngates). Using first element: {}'.format(altitude[0])
@@ -132,6 +134,7 @@ upper-right, upper-left.
 				print 'getFov: altitude must be of a scalar or ndarray(ngates) or ndarray(nbeans,ngates). Using first element: {}'.format(altitude[0])
 				altitude = altitude[0] * ones((nbeams+1, ngates+1))
 		if isinstance(elevation, ndarray):
+			isAltElParamArray = True
 			if elevation.ndim == 1:
 				if elevation.size != ngates:
 					print 'getFov: elevation must be of a scalar or ndarray(ngates) or ndarray(nbeans,ngates). Using first element: {}'.format(elevation[0])
@@ -170,11 +173,42 @@ upper-right, upper-left.
 		# Iterates through beams
 		for ib in beams:
 			# if none of frang, rsep or recrise are arrays, then only execute this for the first loop, otherwise, repeat for every beam
-			if (~isParamArray and ib == 0) or isParamArray:
+			if (~isParamArray and ib == 0) or isParamArray or (isAltElParamArray and model=='GS'):
 				# Calculate center slant range
 				sRangCenter = slantRange(frang[ib], rsep[ib], recrise[ib], gates, center=True)
 				# Calculate edges slant range
 				sRangEdge = slantRange(frang[ib], rsep[ib], recrise[ib], gates, center=False)
+
+                                if model == 'GS':
+                                  #Make sure altitude information is availble.  Do it as a vector to make the GS mapping
+                                  #calculation faster.
+                                  if elevation:
+                                    if isinstance(elevation, ndarray):
+                                      elBeam = elevation[ib,:]
+                                    else:
+                                      elBeam = ndarray(ngates+1)
+                                      elBeam[:] = elevation
+                                    # If you have elevation but not altitude, then you calculate altitude
+                                    # Elevations will take precedence over altitudes in this routine.
+                                    altBeam = sqrt( Re**2 + slantRange**2 + 2. * slantRange * Re * sin( radians(elBeam) ) ) - Re
+                                  else:
+                                    if isinstance(altitude, ndarray):
+                                      altBeam = altitude[ib,:]
+                                    else:
+                                      altBeam = ndarray(ngates+1)
+                                      altBeam[:] = altitude 
+
+                                  #Adjust range for GS model. [Bristow et al., 1994]
+                                  srcArg = sRangCenter**2./4. - altBeam**2.
+                                  srfArg = sRangEdge**2./4.   - altBeam**2.
+                                  
+                                  badInx = where(logical_or(srcArg < 0.,srfArg < 0.))[0]
+                                  srcArg[badInx] = nan
+                                  srfArg[badInx] = nan
+
+                                  sRangCenter = Re * arcsin(sqrt(srcArg)/Re)
+                                  sRangEdge   = Re * arcsin(sqrt(srfArg)/Re)
+
 			# Save into output arrays
 			slantRangeCenter[ib, :-1] = sRangCenter[:-1]
 			slantRangeFull[ib,:] = sRangEdge
@@ -195,19 +229,6 @@ upper-right, upper-left.
 					tElev = elevation[ib,ig]
 					tAlt = altitude[ib,ig]
 
-                                #import ipdb; ipdb.set_trace()
-                                #Adjust range for GS model. [Bristow et al., 1994]
-                                if model == 'GS':
-                                  src = slantRangeCenter[ib,ig]
-                                  srf = slantRangeFull[ib,ig]
-                                  if ((src^2./4. - talt^2.) >= 0) and ((srf^2./4. - talt^2.) >= 0):
-                                    src = Re * asin(sqrt(src^2./4. - talt^2)/Re)
-                                    srf = Re * asin(sqrt(srf^2./4. - talt^2)/Re)
-                                  else:
-                                    src = nan
-                                    srf = nan
-                                  slantRangeCenter[ib,ig] = src
-                                  slantRangeFull[ib,ig] = srf
 
 				# Then calculate projections
 				latC, lonC = calcFieldPnt(siteLat, siteLon, siteAlt*1e-3, siteBore, bOffCenter[ib], sRangCenter[ig], \

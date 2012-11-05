@@ -361,16 +361,15 @@ def plotFanData(myData,myMap,param,coords='geo',model='IS',gsct=0,site=None,\
 |	**INPUTS**:
 |		**myData**: a radar beam object
 |		**myMap**: the map we are plotting on
-|		**[param]**: the parameter we are plotting
+|		**[param]**: the parameter to be plotted, valid inputs are 'velocity', 
+|			'power', 'width', 'elevation', 'phi0'.  default = 'velocity
 |		**[coords]**: the coordinates we are plotting in
 |		**[model]**: the model to use when calculating the radar FOV. This is passed to radFov.fov.
 |                       Options:
 |                         'IS': Ionospheric (default)
 |                         'GS': Ground Scatter (Used for MSTID/Gravity Wave Studies, see Bristow et al. [1994]
 |                         None: Not recommended unless you know what you are doing.
-|		**[param]**: the parameter to be plotted, valid inputs are 'velocity', 
-|			'power', 'width', 'elevation', 'phi0'.  default = 'velocity
-|		**[gsct]**: a flag indicating whether we are distinguishing groudn  scatter
+|		**[gsct]**: a flag indicating whether we are distinguishing ground scatter
 |			default = 0
 |		**[intensities]**: a list of intensities
 |		**[verts]**: a list of vertices
@@ -398,7 +397,6 @@ def plotFanData(myData,myMap,param,coords='geo',model='IS',gsct=0,site=None,\
 	if(fov == None):
 		fov = pydarn.radar.radFov.fov(site=site,rsep=myData['prm']['rsep'],\
 		ngates=myData['prm']['nrang']+1,nbeams= site.maxbeam,coords=coords,model=model)	
-	
 		
 	#loop through gates with scatter
 	for k in range(0,len(myData['fit']['slist'])):
@@ -409,6 +407,9 @@ def plotFanData(myData,myMap,param,coords='geo',model='IS',gsct=0,site=None,\
 			x2,y2 = myMap(fov.lonFull[myData['prm']['bmnum'],r+1],fov.latFull[myData['prm']['bmnum'],r+1])
 			x3,y3 = myMap(fov.lonFull[myData['prm']['bmnum']+1,r+1],fov.latFull[myData['prm']['bmnum']+1,r+1])
 			x4,y4 = myMap(fov.lonFull[myData['prm']['bmnum']+1,r],fov.latFull[myData['prm']['bmnum']+1,r])
+
+                        #Don't plot the point if the coordinates are not valid.  This happens in the GS model.
+                        if numpy.nan in [x1,y1,x2,y2,x3,y3,x4,y4]: continue
 
 			#save the polygon vertices
 			verts.append(((x1,y1),(x2,y2),(x3,y3),(x4,y4),(x1,y1)))
@@ -421,6 +422,10 @@ def plotFanData(myData,myMap,param,coords='geo',model='IS',gsct=0,site=None,\
 			elif(param == 'phi0' and myData[j]['prm']['xcf']): intensities.append(myData['fit']['phi0'][k])
 		else:
 			x1,y1 = myMap(fov.lonCenter[myData['prm']['bmnum'],r],fov.latCenter[myData['prm']['bmnum'],r])
+
+                        #Don't plot the point if the coordinates are not valid.  This happens in the GS model.
+                        if numpy.nan in [x1,y1]: continue
+
 			verts[0].append(x1)
 			verts[1].append(y1)
 			
@@ -448,7 +453,7 @@ def plotFanData(myData,myMap,param,coords='geo',model='IS',gsct=0,site=None,\
 #		scale=[],channel='a',coords='geo',colors='lasse',gsct=0,fov=1,edgeColors='face',gflg=0,fill=1,\
 #		velscl=1000.,legend=1):
 def radDataPlotFan(radDataObj,dateTime=None,interval=1,param='velocity',
-		scale=[],channel='a',coords='geo',colors='lasse',gsct=0,fov=1,edgeColors='face',gflg=0,fill=1,
+		scale=[],channel='a',coords='geo',model='IS',colors='lasse',gsct=0,fov=1,edgeColors='face',gflg=0,fill=1,
 		velscl=1000.,legend=1):
 	"""
 |	*************************************************
@@ -496,7 +501,9 @@ def radDataPlotFan(radDataObj,dateTime=None,interval=1,param='velocity',
 	"""
 	
 	from matplotlib.backends.backend_pdf import PdfPages
+        from scipy.stats import nanmean
 	import models.aacgm as aacgm
+
 
         radDataObj = numpy.array(radDataObj)
 	
@@ -567,6 +574,7 @@ def radDataPlotFan(radDataObj,dateTime=None,interval=1,param='velocity',
             inx += 1
             scan = radDataObj[i][availDt[inx]]['prm']['scan'] 
 
+
           #get to field of view coords in order to determine map limits
           t=allBeams[i][0]['prm']['time']
           code = pydarn.radar.network().getRadarById(allBeams[i][0]['prm']['stid']).code[0]
@@ -588,17 +596,23 @@ def radDataPlotFan(radDataObj,dateTime=None,interval=1,param='velocity',
                           lonFull.append(myFov.lonFull[b][k])
                           latFull.append(myFov.latFull[b][k])
           oldCpids.append(allBeams[i][0]['prm']['cp'])
+
 			
 	#do some stuff in map projection coords to get necessary width and height of map
 	lon_0 = (xmin+xmax)/2.
 	lat_0 = (ymin+ymax)/2.
 	lonFull,latFull = (numpy.array(lonFull)+360.)%360.,numpy.array(latFull)
-	tmpmap = Basemap(projection='npstere', boundinglat=20,lat_0=90, lon_0=numpy.mean(lonFull))
+        #Remove any NaN's
+        good = numpy.where(numpy.logical_not(numpy.logical_or(numpy.isnan(latFull),numpy.isnan(lonFull))))
+        lonFull = lonFull[good]
+        latFull = latFull[good]
+
+	tmpmap = Basemap(projection='npstere', boundinglat=20,lat_0=90, lon_0=nanmean(lonFull))
 	x,y = tmpmap(lonFull,latFull)
-	minx = x.min()
-	miny = y.min()
-	maxx = x.max()
-	maxy = y.max()
+	minx = numpy.nanmin(x)
+	miny = numpy.nanmin(y) 
+	maxx = numpy.nanmax(x) 
+	maxy = numpy.nanmax(y) 
 	width = 1.2*(maxx-minx)
 	height = 1.2*(maxy-miny)
 	cx = minx + width/2.
@@ -607,12 +621,10 @@ def radDataPlotFan(radDataObj,dateTime=None,interval=1,param='velocity',
 	dist = width/50.
 	cTime = sTime
 
-        #import ipdb; ipdb.set_trace()
-	
 	myFig = plot.figure()
 
 	#draw the actual map we want
-	myMap = Basemap(projection='stere',width=width,height=height,lon_0=numpy.mean(lonFull),lat_0=lat_0)
+	myMap = Basemap(projection='stere',width=width,height=height,lon_0=nanmean(lonFull),lat_0=lat_0)
 	myMap.drawparallels(numpy.arange(-80.,81.,10.),labels=[1,0,0,0])
 	myMap.drawmeridians(numpy.arange(-180.,181.,20.),labels=[0,0,0,1])
 	if(coords == 'geo'):
@@ -651,6 +663,7 @@ def radDataPlotFan(radDataObj,dateTime=None,interval=1,param='velocity',
 				
 	bbox = myFig.gca().get_axes().get_position()
 	#now, loop through desired time interval
+
 	while(cTime <= eTime):
 		bndTime = cTime + datetime.timedelta(minutes=interval)
 
