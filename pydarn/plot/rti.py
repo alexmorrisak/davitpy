@@ -29,6 +29,228 @@ from matplotlib.collections import PolyCollection
 from utils.timeUtils import *
 from pydarn.sdio import *
 
+def radDataPlotRti(radDataObj,beam=7,dateTime=None,fileType='Unknown',params=['velocity','power','width'],scales=[],channel='a',
+    coords='gate',model='IS',colors='lasse',yrng=-1,gsct=0,pdf=0,filter=0,gflg=0):
+	"""
+	*******************************
+	
+	PACKAGE: pydarn.plot.rti
+	
+	FUNCTION: plotRti(dateStr,rad,beam=7,time=[0,2400],fileType='fitex',params=['velocity','power','width'], \
+		scales=[],channel='a',coords='gate',colors='lasse',yrng=-1,gsct=0,pdf=0,filter=0,gflg=0)
+	
+	PURPOSE: create an rti plot for a secified radar and time period
+
+	INPUTS:
+		dateStr: a string containing the target date in yyyymmdd format
+		rad: the 3 letter radar code, e.g. 'bks'
+		[beam]: the beam to plot
+                        default: 7
+                [times]: the range of times for which the file should be read,
+                        in SIMPLIFIED [hhmm,hhmm] format, eg [29,156], 
+                        instead of [0029,0156]
+			note that an end time of 2400 will read to the end of the file
+			default = [0,2400]
+		[fileType]: one of ['fitex','fitacf','lmfit']
+			default = 'fitex'
+		[params]: a list of the fit parameters to plot, allowable values are:
+			['velocity','power','width','elevation','phi0']
+			default: ['velocity','power','width']
+		[scales]: a list of the min/max values for the color scale for
+			each param.  If omitted, default scales will be used.  If present,
+			the list should be n x 2 where n is the number of
+			elements in the params list.  Use an empty list for default range,
+			e.g. [[-250,300],[],[]]
+			default: [[-200,200],[0,30],[0,150]]
+		[channel]: the channel you wish to plot, the allowable values are
+			'a' and 'b'
+			default: 'a'
+		[coords]: the coordinates to use for the y axis.  The allowable values are
+			'gate','rng','geo'
+			default: 'gate'
+		[colors]: a string indicating what color bar to use, valid inputs are
+			['lasse','aj']
+			default: 'lasse'
+		[yrng]: a list indicating the min and max values for the y axis in the
+			chosen coordinate system, or a -1 indicating to plot everything
+			default: -1
+		[gsct]: a flag indicating whether to plot ground scatter as transparent
+			default: 0 (ground scatter plotted normally)
+		[pdf]: a flag indicating whether to output to a file
+			default = 0 ( on screen output)
+		[filter]: a flag indicating whether to boxcar filter the data
+			default = 0 (no filter)
+		[gflg]: a flag indicating whether to plot low velocities in gray
+			default = 0 
+	OUTPUTS:
+
+	EXAMPLE:
+		plotRti('20120101','bks',beam=12,time=[10,1453],fileType='fitex',
+		params=['vel','power'],scales=[[-200,200],[]],channel='b',
+		coords='mag'):
+		
+	Written by AJ 20121002
+
+	"""
+	t1 = datetime.datetime.now()
+	#check the inputs
+#	assert(isinstance(dateStr,str) and len(dateStr) == 8),'error, dateStr must be a string 8 chars long'
+#	assert(isinstance(rad,str) and len(rad) == 3),'error, dateStr must be a string 3 chars long'
+#	assert(coords == 'gate' or coords == 'rng' or coords == 'geo' or coords == 'mag'),\
+#	"error, coords must be one of 'gate','rng','geo','mag"
+#	assert(isinstance(beam,int)),'error, beam must be integer'
+#	assert(0 < len(params) < 6),'error, must input between 1 and 5 params in LIST form'
+#	for i in range(0,len(params)):
+#		assert(params[i] == 'velocity' or params[i] == 'power' or params[i] == 'width' or \
+#		params[i] == 'elevation' or params[i] == 'phi0'), \
+#		"error, allowable params are 'velocity','power','width','elevation','phi0'"
+#	assert(scales == [] or len(scales)==len(params)), \
+#	'error, if present, scales must have same number of elements as params'
+#	assert(yrng == -1 or (isinstance(yrng,list) and yrng[0] <= yrng[1])), \
+#	'error, yrng must equal -1 or be a list with the 2nd element larger than the first'
+#	assert(colors == 'lasse' or colors == 'aj'),"error, valid inputs for color are 'lasse' and 'aj'"
+	
+	tscales = []
+	for i in range(0,len(params)):
+		if(scales == [] or scales[i] == []):
+			if(params[i] == 'velocity'): tscales.append([-200,200])
+			elif(params[i] == 'power'): tscales.append([0,30])
+			elif(params[i] == 'width'): tscales.append([0,150])
+			elif(params[i] == 'elevation'): tscales.append([0,50])
+			elif(params[i] == 'phi0'): tscales.append([-numpy.pi,numpy.pi])
+		else: tscales.append(scales[i])
+	scales = tscales
+			
+	#Make sure times provided are within data times.  If not, use the times available in the data object.
+        #If no times set, use the entire times available in the data object.
+        beams = radDataObj.getBeam(beam)
+        times = numpy.array(beams.getTimes())
+        time0 = numpy.min(times)
+        time1 = numpy.max(times)
+
+        if dateTime==None:
+          stime = time0
+          etime = time1
+        elif len(dateTime)==1:
+          if dateTime >= time0 and dateTime <= time1:
+            stime = dateTime
+            etime = time1
+          else:
+            stime = time0
+            etime = time1
+        elif len(dateTime)==2:
+          if dateTime[0] >= time0 and dateTime[0] <= time1: stime = dateTime[0]
+          else: stime = time0
+          if dateTime[1] >= time0 and dateTime[1] <= time1: stime = dateTime[1]
+          else: etime = time1
+        else:
+          stime = time0
+          etime = time1
+	
+        inx = numpy.where(numpy.logical_and(times >= stime,times <= etime))
+        plotTimes = times[inx]
+
+        dateStr = stime.strftime('%Y%m%d')
+        rad = pydarn.radar.network().getRadarById(beams[plotTimes[0]]['prm']['stid']).code[0]
+        oc = beams[plotTimes[0]]['prm']['origin.command']
+
+	vel,pow,wid,elev,phi0,times,freq,cpid,nave,nsky,nsch,slist,mode,rsep,nrang,frang=[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]
+        for key in plotTimes:
+          myBeam = beams[key]
+          if(myBeam['prm']['time'] > etime): break
+          if(myBeam['prm']['bmnum'] == beam and (stime <= myBeam['prm']['time'])):
+                  times.append(myBeam['prm']['time'])
+                  cpid.append(myBeam['prm']['cp'])
+                  nave.append(myBeam['prm']['nave'])
+                  nsky.append(myBeam['prm']['noise.sky'])
+                  rsep.append(myBeam['prm']['rsep'])
+                  nrang.append(myBeam['prm']['nrang'])
+                  frang.append(myBeam['prm']['frang'])
+                  nsch.append(myBeam['prm']['noise.search'])
+                  freq.append(myBeam['prm']['tfreq']/1e3)
+                  slist.append(myBeam['fit']['slist'])
+                  mode.append(myBeam['prm']['ifmode'])
+                  if('velocity' in params): vel.append(myBeam['fit']['v'])
+                  if('power' in params): pow.append(myBeam['fit']['p_l'])
+                  if('width' in params): wid.append(myBeam['fit']['w_l'])
+                  if('elevation' in params): elev.append(myBeam['fit']['elv'])
+                  if('phi0' in params): phi0.append(myBeam['fit']['phi0'])
+			
+	rtiFig = plot.figure()
+
+	rtiTitle(dateStr,rad,fileType,beam)
+	
+	plotNoise(rtiFig,times,nsky,nsch)
+	
+	plotFreq(rtiFig,times,freq,nave)
+	
+	plotCpid(rtiFig,times,cpid,mode)
+	
+	
+	
+	figtop = .77
+	figheight = .72/len(params)
+	for p in range(len(params)):
+		if(params[p] == 'velocity'): pArr = vel
+		elif(params[p] == 'power'): pArr = pow
+		elif(params[p] == 'width'): pArr = wid
+		elif(params[p] == 'elevation'): pArr = elev
+		elif(params[p] == 'phi0'): pArr = phi0
+		pos = [.1,figtop-figheight*(p+1)+.02,.76,figheight-.02]
+		
+		ax = drawAxes(rtiFig,times,rad,cpid,beam,nrang,frang,rsep,p==len(params)-1,yrng=yrng,coords=coords,model=model,pos=pos)
+			
+
+		if(pArr == []): continue
+		
+		rmax = max(nrang)
+		data=numpy.zeros((len(times)*2,rmax))+100000
+		x=numpy.zeros(len(times)*2)
+		tcnt = 0
+		#x = matplotlib.dates.date2num(times)
+		for i in range(len(times)):
+			x[tcnt]=matplotlib.dates.date2num(times[i])
+			if(i < len(times)-1):
+				if(matplotlib.dates.date2num(times[i+1])-x[tcnt] > 4./1440.):
+					tcnt += 1
+					x[tcnt] = x[tcnt-1]+1./1440.
+			tcnt += 1
+					
+			if(pArr[i] == []): continue
+			
+			for j in range(len(slist[i])):
+				data[tcnt][slist[i][j]] = pArr[i][j]
+				
+		if(coords == 'gate'): y = numpy.linspace(0,rmax,rmax+1)
+		elif(coords == 'rng'):
+                    site = pydarn.radar.network().getRadarByCode(rad).getSiteByDate(times[0])
+                    myFov = pydarn.radar.radFov.fov(site=site, ngates=rmax,nbeams=site.maxbeam,rsep=rsep[0],coords=coords,model=model)
+                    y = myFov.slantRCenter[beam]
+		else:
+                    site = pydarn.radar.network().getRadarByCode(rad).getSiteByDate(times[0])
+                    myFov = pydarn.radar.radFov.fov(site=site, ngates=rmax,nbeams=site.maxbeam,rsep=rsep[0],coords=coords,model=model)
+                    y =  myFov.latFull[beam]
+			
+		X, Y = numpy.meshgrid(x[:tcnt], y)
+		
+
+		
+		#data = numpy.ma.masked_where(data == 100000., data)
+		pcoll = plot.pcolormesh(X, Y, data[:tcnt][:].T, lw=0.01,edgecolors='None',alpha=1,lod=True)
+		
+			
+		pydarn.plot.plotUtils.genCmap(rtiFig,pcoll,params[p],scales[p],pos=pos,colors=colors,gflg=gflg)
+			
+	print 'done plot'
+	
+
+
+	if(pdf):
+		rtiFig.savefig('/home/miker/temp.png',orientation='landscape', papertype='letter',dpi=300)
+	else:
+		rtiFig.show()
+		
+	print datetime.datetime.now()-t1
 def plotRti(dateStr,rad,beam=7,time=[0,2400],fileType='fitex',params=['velocity','power','width'], \
 scales=[],channel='a',coords='gate',model='IS',colors='lasse',yrng=-1,gsct=0,pdf=0,filter=0,gflg=0):
 	"""
