@@ -145,7 +145,6 @@ trace = tsyganenko.tsygTrace(filename='trace.dat')
 |
 |   Written by Sebastien 2012-10
         """
-        from models.tsyganenko import tsygFort
         from numpy import radians, degrees, zeros
 
         # Store existing values of class attributes in case something is wrong
@@ -367,15 +366,15 @@ bzimf={:3.0f}                       [nT]
         self.rhoSH = obj.rhoSH
 
 
-    def plot(self, proj='xz', color='b', showPts=False, 
-        subplot=111, showEarth=True, disp=True, **kwargs):
+    def plot(self, proj='xz', color='b', onlyPts=None, showPts=False, 
+        showEarth=True, disp=True, **kwargs):
         """
 |   Generate a 2D plot of the trace projected onto a given plane
 |   Graphic keywords apply to the plot method for the field lines
 |   
 |   **INPUTS**:
 |       **plane**: the projection plane in GSW coordinates
-|       **subplot**: subplot position
+|       **onlyPts**: if the trace countains multiple point, only show the specified indices (list)
 |       **showEarth**: Toggle Earth disk visibility on/off
 |       **showPts**: Toggle start points visibility on/off
 |       **disp**: invoke pylab.show()
@@ -387,68 +386,87 @@ bzimf={:3.0f}                       [nT]
 |
 |   Written by Sebastien 2012-10
         """
-        from pylab import gcf, show
+        from pylab import gcf, gca, show
         from matplotlib.patches import Circle
-        from numpy import pi, linspace, outer, ones, size, cos, sin, radians
+        from numpy import pi, linspace, outer, ones, size, cos, sin, radians, cross
 
         assert (len(proj) == 2) or \
             (proj[0] in ['x','y','z'] and proj[1] in ['x','y','z']) or \
             (proj[0] != proj[1]), 'Invalid projection plane'
 
         fig = gcf()
-        ax = fig.add_subplot(subplot)
+        ax = fig.gca()
         ax.set_aspect('equal')
 
         # First plot a nice disk for the Earth
         if showEarth:
-            circ = Circle(xy=(0,0), radius=1, facecolor='0.8', edgecolor='k', alpha=.5, zorder=-1)
+            circ = Circle(xy=(0,0), radius=1, facecolor='0.8', edgecolor='k', alpha=.5, zorder=0)
             ax.add_patch(circ)
 
+        # Select indices to show
+        if onlyPts is None:
+            inds = xrange(len(self.lat))
+        else:
+            try:
+                inds = [ip for ip in onlyPts]
+            except:
+                inds = [onlyPts]
+
         # Then plot the traced field line
-        for ip in xrange(len(self.lat)):
+        for ip in inds:
             # Select projection plane
             if proj[0] == 'x':
                 xx = self.xTrace[ip,0:self.l[ip]]
                 xpt = self.xGsw[ip]
                 ax.set_xlabel(r'$X_{GSW}$')
+                xdir = [1,0,0]
             elif proj[0] == 'y':
                 xx = self.yTrace[ip,0:self.l[ip]]
                 xpt = self.yGsw[ip]
                 ax.set_xlabel(r'$Y_{GSW}$')
+                xdir = [0,1,0]
             elif proj[0] == 'z':
                 xx = self.zTrace[ip,0:self.l[ip]]
                 xpt = self.zGsw[ip]
                 ax.set_xlabel(r'$Z_{GSW}$')
+                xdir = [0,0,1]
             if proj[1] == 'x':
                 yy = self.xTrace[ip,0:self.l[ip]]
                 ypt = self.xGsw[ip]
                 ax.set_ylabel(r'$X_{GSW}$')
+                ydir = [1,0,0]
             elif proj[1] == 'y':
                 yy = self.yTrace[ip,0:self.l[ip]]
                 ypt = self.yGsw[ip]
                 ax.set_ylabel(r'$Y_{GSW}$')
+                ydir = [0,1,0]
             elif proj[1] == 'z':
                 yy = self.zTrace[ip,0:self.l[ip]]
                 ypt = self.zGsw[ip]
                 ax.set_ylabel(r'$Z_{GSW}$')
+                ydir = [0,0,1]
+            sign = 1 if -1 not in cross(xdir,ydir) else -1
+            if 'x' not in proj: zz = sign*self.xGsw[ip]
+            if 'y' not in proj: zz = sign*self.yGsw[ip]
+            if 'z' not in proj: zz = sign*self.zGsw[ip]
             # Plot
-            ax.plot(xx, yy, c=color, **kwargs)
+            ax.plot(xx, yy, c=color, zorder=zz, **kwargs)
             if showPts:
-                ax.scatter(xpt, ypt, c='k')
+                ax.scatter(xpt, ypt, c='k', s=40, zorder=zz)
 
         if disp: show()
 
         return ax
 
 
-    def plot3d(self, subplot=111, showEarth=True, showPts=False, disp=True, 
+    def plot3d(self, onlyPts=None, showEarth=True, showPts=False, disp=True, 
         xyzlim=None, zorder=1, linewidth=2, color='b', **kwargs):
         """
 |   Generate a 3D plot of the trace
 |   Graphic keywords apply to the plot3d method for the field lines
 |   
 |   **INPUTS**:
-|       **subplot**: subplot position
+|       **onlyPts**: if the trace countains multiple point, only show the specified indices (list)
 |       **showEarth**: Toggle Earth sphere visibility on/off
 |       **showPts**: Toggle start points visibility on/off
 |       **disp**: invoke pylab.show()
@@ -465,10 +483,10 @@ bzimf={:3.0f}                       [nT]
         """
         from mpl_toolkits.mplot3d import proj3d
         from numpy import pi, linspace, outer, ones, size, cos, sin, radians
-        from pylab import gcf, show
+        from pylab import gca, gcf, show
 
         fig = gcf()
-        ax = fig.add_subplot(subplot, projection='3d')
+        ax = fig.gca(projection='3d')
 
         # First plot a nice sphere for the Earth
         if showEarth:
@@ -479,8 +497,18 @@ bzimf={:3.0f}                       [nT]
             tz = outer(ones(size(u)), cos(v))
             ax.plot_surface(tx,ty,tz,rstride=10, cstride=10, color='grey', alpha=.5, zorder=0, linewidth=0.5)
 
+
+        # Select indices to show
+        if onlyPts is None:
+            inds = xrange(len(self.lat))
+        else:
+            try:
+                inds = [ip for ip in onlyPts]
+            except:
+                inds = [onlyPts]
+
         # Then plot the traced field line
-        for ip in xrange(len(self.lat)):
+        for ip in inds:
             ax.plot3D(  self.xTrace[ip,0:self.l[ip]],
                         self.yTrace[ip,0:self.l[ip]],
                         self.zTrace[ip,0:self.l[ip]], 
