@@ -29,7 +29,9 @@ from matplotlib.collections import PolyCollection
 from utils.timeUtils import *
 from pydarn.sdio import *
 
-def radDataPlotRti(radDataObj,beam=7,dateTime=None,fileType='Unknown',params=['velocity','power','width'],scales=[],channel='a',
+
+class radDataPlotRti(object):
+  def __init__(self,radDataObj,beam=7,dateTime=None,fileType='Unknown',params=['velocity','power','width'],scales=[],channel='a',
     coords='gate',model='IS',colors='lasse',yrng=-1,gsct=0,pdf=0,filter=0,gflg=0):
 	"""
 	*******************************
@@ -240,16 +242,19 @@ def radDataPlotRti(radDataObj,beam=7,dateTime=None,fileType='Unknown',params=['v
 		
 			
 		pydarn.plot.plotUtils.genCmap(rtiFig,pcoll,params[p],scales[p],pos=pos,colors=colors,gflg=gflg)
+
+                self.fig = rtiFig
+                self.ax  = ax
 			
 	print 'done plot'
 	
 
 
-	if(pdf):
-		rtiFig.savefig('/home/miker/temp.png',orientation='landscape', papertype='letter',dpi=300)
-	else:
-		rtiFig.show()
-		
+#	if(pdf):
+#		rtiFig.savefig('/home/miker/temp.png',orientation='landscape', papertype='letter',dpi=300)
+#	else:
+#		rtiFig.show()
+#		
 	print datetime.datetime.now()-t1
 def plotRti(dateStr,rad,beam=7,time=[0,2400],fileType='fitex',params=['velocity','power','width'], \
 scales=[],channel='a',coords='gate',model='IS',colors='lasse',yrng=-1,gsct=0,pdf=0,filter=0,gflg=0):
