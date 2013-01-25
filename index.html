@@ -15,8 +15,8 @@
   <body>
     <div class="wrapper">
       <header>
-        <h1>pyDARN</h1>
-        <p>The SuperDARN Python analysis toolkit</p>
+        <h1>DaViT-py</h1>
+        <p>The SuperDARN <b>D</b>ata </b>A</b>nalysis and </b>Vi</b>sualization </b>T</b>oolkit in </b>Py</b>thon</p>
         <p class="view"><a href="https://github.com/vtsuperdarn/davitpy">View the Project on GitHub <small>vtsuperdarn/davitpy</small></a></p>
         <ul>
           <li><a href="https://github.com/vtsuperdarn/davitpy/zipball/master">Download <strong>ZIP File</strong></a></li>
@@ -25,40 +25,58 @@
         </ul>
       </header>
       <section>
-        <p>SuperDARN current data analysis software is mainly IDL based and scattered over each member institution (i.e., extremely redundant, with limited quality control). We are trying to start an open-source python module complying with SuperDARN conventions which would include fundamental i/o and visualization functions. Regular releases of this module could easily be distributed to the space sciences community.</p>
+        <p>SuperDARN current data analysis software is mainly IDL based and scattered over each member institution 
+        (i.e., extremely redundant, with limited quality control). We are trying to start an open-source python module 
+        complying with SuperDARN conventions which would include fundamental i/o and visualization functions. Regular 
+        releases of this module could easily be distributed to the space sciences community.</p>
+
+<p>
+As part of this project, we are planning on moving towards a database-oriented access to SuperDARN data, 
+instead of the current dmap file formats for the data analysis and visualization. Files will remain in
+use for safe storage and lower levels applications, but users of DaViTpy will have direct access to a remote
+database of all publicly available SuperDARN data. A NoSQL DB (MongoDB) has been successfuly implemented in the
+current development version of DaViTpy. We believe that the proper implementation of a DB is a very important step in 
+improving useability and analysis of an increasingly rich SuperDARN dataset.
+</p>
 
 <p>This is an ongoing effort with no current release yet. If you are interested in contributing to this project, please contact us.</p>
 
-<h3>Planned code structure</h3>
-
-<p>Up for discussion...</p>
+<h3>Code structure</h3>
 
 <ul>
  <li>
   <p>pyDARN:</p>
   <ul>
    <li>radar: radar structures/parameters (mapping, operation...)</li>
-   <li>io: data I/O (fitacf, fitex...)</li>
+   <li>sdio: data I/O (fitacf, fitex...)</li>
    <li>plot: visualization tools (rti, fovs, map potential...)</li>
-   <li>processing: data analysis tools (median filter, scatter identification, fft...)</li>
+   <li>proc: data analysis tools (median filter, scatter identification, fft...)</li>
   </ul>
  </li>
  <li><p>utils: utilities (formatting, sunrise/sunset, geometric transforms, ...)</p></li>
  <li><p>Models: AACGM, ray tracing, ionosphere/thermosphere models (IRI, MSIS, HWM, IGRF)</p></li>
- <li><p>GMI: geomagnetic indices interface (Dst, Kp...)</p></li>
+ <li><p>GMI: geomagnetic indices and more interface (Dst, Kp, ACE...)</p></li>
 </ul>
 
 <h3>Data structures</h3>
 
-<p>Up for discussion...</p>
-
 <ul>
 <li>data</li>
 <li>parameters</li>
-</ul><h3>Contributing</h3>
+</ul>
 
-<p>Workflow TBD...</p>
+<h3>Contributing</h3>
+
+<p>If you are interested in contributing to this project, more details about specific features and conventions can be found on our Github Wiki or 
+in our Google Group discussions</p>
+<ul>
+<li>Project wiki <a href="https://github.com/vtsuperdarn/davitpy/wiki">https://github.com/vtsuperdarn/davitpy/wiki</a></li>
+<li>Current code documentation <a href="http://davit.ece.vt.edu/davitpy/">http://davit.ece.vt.edu/davitpy/</a></li>
+<li>Project Trello (ToDos) <a href="https://trello.com/b/djb82luC">https://trello.com/b/djb82luC</a></li>
+</ul>
+
       </section>
+      
       <footer>
         <p>This project is maintained by <a href="https://github.com/vtsuperdarn">vtsuperdarn</a></p>
         <p><small>Hosted on GitHub Pages &mdash; Theme by <a href="https://github.com/orderedlist">orderedlist</a></small></p>
