@@ -3,7 +3,7 @@
 .DS_store
 history.sqlite
 *.o
-*omni*
+
 *minute*
 *.swp
 *-swp
@@ -14,4 +14,6 @@ bin/profile_davitpy/security/kernel*
 *.log
 *.xcworkspace
 *.sublime-workspace
+*.sublime-project
 *.orig
+models/aacgm/build

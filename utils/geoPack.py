@@ -39,7 +39,7 @@ OUTPUTS
 	lon: longitude [degree]
 	Re: Earth radius [km]
 	"""
-	from math import degrees, radians, cos, sin, tan, atan, atan2, sqrt
+	from numpy import degrees, radians, cos, sin, tan, arctan, arctan2, sqrt
 	
 	assert isinstance(into, str), 'geodToGeoc: Argument "into" must be a string. Try again!'
 	
@@ -50,12 +50,12 @@ OUTPUTS
 	
 	if into == 'geoc':
 		# geodetic into geocentric
-		latOut = degrees( atan( b**2/a**2 * tan( radians(lat) ) ) )
+		latOut = degrees( arctan( b**2/a**2 * tan( radians(lat) ) ) )
 		lonOut = lon
 		Re = a / sqrt( 1. + e2 * sin( radians(latOut) )**2 )
 	elif into == 'geod':
 		# geocentric into geodetic
-		latOut = degrees( atan( a**2/b**2 * tan( radians(lat) ) ) )
+		latOut = degrees( arctan( a**2/b**2 * tan( radians(lat) ) ) )
 		lonOut = lon
 		Re = a / sqrt( 1. + e2 * sin( radians(lat) )**2 )
 	else:
@@ -85,7 +85,7 @@ OUTPUTS
 	az: azimuth [degree, N]
 	el: elevation [degree]
 	"""
-	from math import degrees, radians, cos, sin, tan, atan, atan2, sqrt
+	from numpy import degrees, radians, cos, sin, tan, arctan, arctan2, sqrt
 	
 	assert isinstance(into, str), 'geodToGeocAzEl: Argument "into" must be a string. Try again!'
 	
@@ -106,8 +106,8 @@ OUTPUTS
 		kyGC = kyGD * cos( devH ) + kzGD * sin( devH )
 		kzGC = -kyGD * sin( devH ) + kzGD * cos( devH )
 		# Finally calculate the new azimuth and elevation in the geocentric frame
-		azOut = degrees( atan2( kxGC, kyGC ) )
-		elOut = degrees( atan( kzGC / sqrt( kxGC**2 + kyGC**2 ) ) )
+		azOut = degrees( arctan2( kxGC, kyGC ) )
+		elOut = degrees( arctan( kzGC / sqrt( kxGC**2 + kyGC**2 ) ) )
 		latOut = geocLat
 		lonOut = geocLon
 	elif into == 'geod':
@@ -123,8 +123,8 @@ OUTPUTS
 		kyGD = kyGC * cos( -devH ) + kzGC * sin( -devH )
 		kzGD = -kyGC * sin( -devH ) + kzGC * cos( -devH )
 		# Finally calculate the new azimuth and elevation in the geocentric frame
-		azOut = degrees( atan2( kxGD, kyGD ) )
-		elOut = degrees( atan( kzGD / sqrt( kxGD**2 + kyGD**2 ) ) )
+		azOut = degrees( arctan2( kxGD, kyGD ) )
+		elOut = degrees( arctan( kzGD / sqrt( kxGD**2 + kyGD**2 ) ) )
 		latOut = geodLat
 		lonOut = geodLon
 	else:
@@ -156,7 +156,7 @@ OUTPUTS
 	Y: global cartesian Y [km] or longitude [degree]
 	Z: global cartesian Z [km] or distance from center of the Earth [km]
 	"""
-	from math import radians, degrees, cos, sin, asin, atan2, sqrt
+	from numpy import radians, degrees, cos, sin, arcsin, arctan2, sqrt
 	
 	assert isinstance(into, str), 'gspToGcar: Argument "into" must be a string. Try again!'
 	
@@ -168,8 +168,8 @@ OUTPUTS
 	elif into == 'gsp':
 		# Calculate latitude (xOut), longitude (yOut) and distance from center of the Earth (zOut)
 		zOut = sqrt( X**2 + Y**2 + Z**2 )
-		xOut = degrees( asin( Z/zOut ) )
-		yOut = degrees( atan2( Y, X ) )
+		xOut = degrees( arcsin( Z/zOut ) )
+		yOut = degrees( arctan2( Y, X ) )
 	else:
 		print 'gspToGcar: {} is not a valid system. Try again!'.format(into)
 		
@@ -206,7 +206,7 @@ OUTPUTS
 	Y: local cartesian Y [km] or global cartesian Y [km]
 	Z: local cartesian Z [km] or global cartesian Z [km]
 	"""
-	from math import radians, degrees, cos, sin
+	from numpy import radians, degrees, cos, sin
 	
 	assert isinstance(into, str), 'gcarToLcar: Argument "into" must be a string. Try again!'
 	
@@ -277,7 +277,7 @@ OUTPUTS
 	Y: local cartesian Y [km] or elevation [degree]
 	Z: local cartesian Z [km] or distance from origin [km]
 	"""
-	from math import radians, degrees, cos, sin, asin, atan2, sqrt
+	from numpy import radians, degrees, cos, sin, arcsin, arctan2, sqrt
 	
 	assert(isinstance(into, str)), 'lspToLcar: Argument "into" must be a string. Try again!'
 	
@@ -292,8 +292,8 @@ OUTPUTS
 	elif into == 'lsp':
 		# local cartesian into local spherical
 		r = sqrt( X**2 + Y**2 + Z**2 )
-		el = degrees( asin(Z/r) )
-		az = degrees( atan2(X, Y) )
+		el = degrees( arcsin(Z/r) )
+		az = degrees( arctan2(X, Y) )
 		xOut = az
 		yOut = el
 		zOut = r
@@ -309,10 +309,14 @@ def calcDistPnt(origLat, origLon, origAlt, \
 			distLat=None, distLon=None, distAlt=None):
 	"""
 Calculate 
-- the coordinates of a distant point given a point of origin, distance, 
+- the coordinates and altitude of a distant point given a point of origin, distance, 
+azimuth and elevation, or 
+- the coordinates and distance of a distant point given a point of origin, altitude, 
 azimuth and elevation, or 
 - the distance, azimuth and elevation between a point of origin and a 
-distant point.
+distant point or 
+- the distance, azimuth between a point of origin and a distant point and the altitude
+of said distant point given a point of origin, distant point and elevation angle.
 Input/output is in geodetic coordinates, distances are in km and angles in degrees.
 
 INPUTS:
@@ -327,23 +331,18 @@ OUTPUTS:
 	dict: a dictionary containing all the information about origin and distant \
 		points and their relative positions
 	"""
-	from math import sqrt
+	from math import sqrt, pi
+	import numpy
 	
 	# If all the input parameters (keywords) are set to 0, show a warning, and default to fint distance/azimuth/elevation
-	if None in [dist, el, az]:
-		mode = 'findDistAzEl'
-		assert None not in [distLat, distLon, distAlt], 'calcDistPnt: Warning: No keywords are set.'
-	elif None in [distLat, distLon, distAlt]:
-		mode = 'findDistPnt'
-	else:
-		return
-	
-	if mode == 'findDistAzEl':
+	if dist is None and el is None and az is None:
+		assert None not in [distLat, distLon, distAlt], 'calcDistPnt: Warning: Not enough keywords.'
+
 		# Convert point of origin from geodetic to geocentric
 		(gcLat, gcLon, origRe) = geodToGeoc(origLat, origLon, into='geoc')
 		# Convert distant point from geodetic to geocentric
 		(gcDistLat, gcDistLon, distRe) = geodToGeoc(distLat, distLon, into='geoc')
-		# convert point of origin from geocentric to global cartesian
+		# convert distant point from geocentric to global cartesian
 		(pX, pY, pZ) = gspToGcar(gcDistLat, gcDistLon, distRe+distAlt, into='gcar')
 		# convert pointing direction from global cartesian to local cartesian
 		(dX, dY, dZ) = gcarToLcar(pX, pY, pZ, gcLat, gcLon, origRe+origAlt, into='lcar')
@@ -352,8 +351,10 @@ OUTPUTS:
 		# convert pointing azimuth and elevation to geodetic
 		(lat, lon, Re, az, el) = geodToGeocAzEl(gcLat, gcLon, gaz, gel, into='geod')
 		dist = sqrt( dX**2 + dY**2 + dZ**2 )
-		
-	elif mode == 'findDistPnt':
+
+	elif distLat is None and distLon is None and distAlt is None:
+		assert None not in [dist, el, az], 'calcDistPnt: Warning: Not enough keywords.'
+
 		# convert pointing azimuth and elevation to geocentric
 		(gcLat, gcLon, origRe, gaz, gel) = geodToGeocAzEl(origLat, origLon, az, el, into='geoc')
 		# convert pointing direction from local spherical to local cartesian
@@ -366,6 +367,57 @@ OUTPUTS:
 		(distLat, distLon, Re) = geodToGeoc(gcDistLat, gcDistLon, into='geod')
 		distAlt = rho - Re
 		distRe = Re
+
+	elif dist is None and distAlt is None and az is None:
+		assert None not in [distLat, distLon, el], 'calcDistPnt: Warning: Not enough keywords.'
+
+		# Convert point of origin from geodetic to geocentric
+		(gcLat, gcLon, origRe) = geodToGeoc(origLat, origLon, into='geoc')
+		Dref = origRe + origAlt
+		# convert point of origin from geocentric to global cartesian
+		(pX, pY, pZ) = gspToGcar(gcLat, gcLon, Dref, into='gcar')
+		# Convert distant point from geodetic to geocentric
+		(gcDistLat, gcDistLon, distRe) = geodToGeoc(distLat, distLon, into='geoc')
+		# convert distant point from geocentric to global cartesian
+		(pdX, pdY, pdZ) = gspToGcar(gcDistLat, gcDistLon, Dref, into='gcar')
+		# convert pointing direction from global cartesian to local cartesian
+		(dX, dY, dZ) = gcarToLcar(pdX, pdY, pdZ, gcLat, gcLon, Dref, into='lcar')
+		# convert pointing direction from local cartesian to local spherical
+		(gaz, gel, rho) = lspToLcar(dX, dY, dZ, into='lsp')
+		# convert pointing azimuth and elevation to geodetic
+		(lat, lon, Re, az, _) = geodToGeocAzEl(gcLat, gcLon, gaz, gel, into='geod')
+		# convert pointing azimuth and elevation to geocentric
+		(gcLat, gcLon, origRe, gaz, gel) = geodToGeocAzEl(origLat, origLon, az, el, into='geoc')
+		# calculate altitude and distance
+		theta = numpy.arccos( (pdX*pX + pdY*pY + pdZ*pZ)/Dref**2 )
+		distAlt = Dref*( numpy.cos(numpy.radians(gel))/numpy.cos(theta+numpy.radians(gel)) - 1. )
+		distAlt -= distRe - origRe
+		dist = Dref*numpy.sin(theta)/numpy.cos(theta+numpy.radians(gel))
+
+	elif distLat is None and distLon is None and dist is None:
+		assert None not in [distAlt, el, az], 'calcDistPnt: Warning: Not enough keywords.'
+
+		# convert pointing azimuth and elevation to geocentric
+		(gcLat, gcLon, origRe, gaz, gel) = geodToGeocAzEl(origLat, origLon, az, el, into='geoc')
+		# Calculate angles
+		alpha = numpy.arcsin( (origRe+origAlt)*numpy.cos(numpy.radians(gel))/(origRe+distAlt) )
+		theta = pi/2. - alpha - numpy.radians(gel)
+		# calculate distance
+		dist = numpy.sqrt( (origRe+origAlt)**2 + (origRe+distAlt)**2 -
+							2.*(origRe+distAlt)*(origRe+origAlt)*numpy.cos(theta) )
+		# convert pointing direction from local spherical to local cartesian
+		(pX, pY, pZ) = lspToLcar(gaz, gel, dist, into='lcar')
+		# convert pointing direction from local cartesian to global cartesian
+		(dX, dY, dZ) = gcarToLcar(pX, pY, pZ, gcLat, gcLon, origRe+origAlt, into='gcar')
+		# Convert distant point from global cartesian to geocentric
+		(gcDistLat, gcDistLon, rho) = gspToGcar(dX, dY, dZ, into='gsp')
+		# Convert distant point from geocentric to geodetic
+		(distLat, distLon, distRe) = geodToGeoc(gcDistLat, gcDistLon, into='geod')
+		distAlt = rho - distRe
+
+	else:
+		return
+	
 	# Fill output dictionary
 	dictOut = {'origLat': origLat, 'origLon': origLon, 'origAlt': origAlt, \
 				'distLat': distLat, 'distLon': distLon, 'distAlt': distAlt, \
@@ -374,32 +426,34 @@ OUTPUTS:
 	return dictOut
 
 
+# *************************************************************
 def greatCircleMove(origLat, origLon, dist, az):
-	import math
+	import numpy
 	
 	Re = 6378.1e3
-	lat1 = math.radians(origLat) 
-	lon1 = math.radians(origLon)
-	az = math.radians(az)
+	lat1 = numpy.radians(origLat) 
+	lon1 = numpy.radians(origLon)
+	az = numpy.radians(az)
 	
-	lat2 = math.asin(math.sin(lat1)*math.cos(dist/Re) +\
-	math.cos(lat1)*math.sin(dist/Re)*math.cos(az))
-	lon2 = lon1 + math.atan2(math.sin(az)*math.sin(dist/Re)*math.cos(lat1),\
-	math.cos(dist/Re)-math.sin(lat1)*math.sin(lat2))
+	lat2 = numpy.arcsin(numpy.sin(lat1)*numpy.cos(dist/Re) +\
+	numpy.cos(lat1)*numpy.sin(dist/Re)*numpy.cos(az))
+	lon2 = lon1 + numpy.arctan2(numpy.sin(az)*numpy.sin(dist/Re)*numpy.cos(lat1),\
+	numpy.cos(dist/Re)-numpy.sin(lat1)*numpy.sin(lat2))
 
-	return [math.degrees(lat2),math.degrees(lon2)]
+	return [numpy.degrees(lat2),numpy.degrees(lon2)]
 
-	
+
+# *************************************************************
 def greatCircleAzm(lat1,lon1,lat2,lon2):
 	
-	import math
-	lat1,lon1,lat2,lon2 = math.radians(lat1),math.radians(lon1),math.radians(lat2),math.radians(lon2)
+	import numpy
+	lat1,lon1,lat2,lon2 = numpy.radians(lat1),numpy.radians(lon1),numpy.radians(lat2),numpy.radians(lon2)
 	
-	y = math.sin(lon2-lon1) * math.cos(lat2)
-	x = math.cos(lat1)*math.sin(lat2) - math.sin(lat1)*math.cos(lat2)*math.cos(lon2-lon1)
+	y = numpy.sin(lon2-lon1) * numpy.cos(lat2)
+	x = numpy.cos(lat1)*numpy.sin(lat2) - numpy.sin(lat1)*numpy.cos(lat2)*numpy.cos(lon2-lon1)
 	
-	azm = math.atan2(y,x)
+	azm = numpy.arctan2(y,x)
 
-	return math.degrees(azm)
+	return numpy.degrees(azm)
 
 	

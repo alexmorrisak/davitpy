@@ -1,24 +1,44 @@
 # Main DaViT-py module __init__.py
 """
 *******************************
-            DARNpy
+            pydarn
 *******************************
-Main DaViT-py module
+Module for everything SuperDARN
 
 This includes the following submodules:
-	io
-		SuperDARN data I/O
-	radar
-		SuperDARN radars information
-	plot
-		
-	proc
-	utils
+	* **sdio**: SuperDARN data I/O
+	* **radar**:SuperDARN radars information
+	* **plot**: plotting routines
+	* **proc**: misc
+	* **utils**: general utilities
 
 *******************************
 """
 
+try: import dmapio 
+except Exception, e: 
+	print e
+	'problem importing dmapio'
 
+try: import radar 
+except Exception, e: 
+	print e
+	'problem importing radar'
+
+try: import sdio 
+except Exception, e: 
+	print e
+	'problem importing sdio'
+
+try: import plot 
+except Exception, e: 
+	print e
+	'problem importing plot'
+
+try: import proc 
+except Exception, e: 
+	print e
+	'problem importing proc'
 
 from dmapio import *
 from radar import *

@@ -68,7 +68,7 @@ def yyyymmddToDate(dateStr):
 	"""
 	
 	from datetime import datetime
-	
+	import sys
 	#check input type
 	if isinstance(dateStr,str):
 		#try to make the date object
@@ -151,6 +151,6 @@ def datetimeToEpoch(myDate):
 	"""
 	
 	import datetime,calendar
-	
-	return calendar.timegm(myDate.timetuple())
+	print myDate
+	return calendar.timegm(myDate.timetuple())+myDate.microsecond/1e6
 
