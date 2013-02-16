@@ -1,9 +1,10 @@
 *~
+*.rst
 *.pyc
 .DS_store
 history.sqlite
 *.o
-
+sphinx/
 *minute*
 *.swp
 *-swp
@@ -17,3 +18,5 @@ bin/profile_davitpy/security/kernel*
 *.sublime-project
 *.orig
 models/aacgm/build
+/docs/sphinx/*
+/docs.sphinx
